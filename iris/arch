@@ -1,0 +1,209 @@
+# IrisPath 项目架构文档
+
+## 1. 项目结构
+
+```
+iris/
+├── src/
+│   ├── components/           # 组件目录
+│   │   ├── layout/           # 布局组件
+│   │   │   └── Header.tsx    # 头部组件
+│   │   ├── pathology/        # 病理相关组件
+│   │   │   ├── CanvasViewer.tsx      # 中间画布组件
+│   │   │   ├── ChatPanel.tsx         # 左侧聊天面板
+│   │   │   ├── EvidencePanel.tsx     # 右侧证据面板
+│   │   │   └── 其他辅助组件           # 分析面板、报告等
+│   │   └── ui/               # 通用 UI 组件
+│   │       ├── button.tsx    # 按钮组件
+│   │       └── card.tsx      # 卡片组件
+│   ├── lib/                  # 工具库
+│   │   ├── mock-data.ts      # 模拟数据
+│   │   └── utils.ts          # 工具函数
+│   ├── services/             # 服务层
+│   │   └── api.ts            # API 调用封装
+│   ├── store/                # 状态管理
+│   │   └── useCaseStore.ts   # 病例状态管理
+│   ├── types/                # 类型定义
+│   │   └── index.ts          # 核心类型定义
+│   ├── App.tsx               # 应用主组件
+│   ├── index.css             # 全局样式
+│   └── main.tsx              # 应用入口
+├── vite.config.ts            # Vite 配置
+├── tsconfig.json             # TypeScript 配置
+└── package.json              # 项目依赖
+```
+
+## 2. 核心文件关系
+
+### 2.1 数据流向
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│  CanvasViewer   │────▶│  useCaseStore   │────▶│  API Service    │
+│  (文件上传)      │     │  (状态管理)      │     │  (后端调用)      │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+          ▲                       │                       │
+          │                       │                       │
+          │                       ▼                       │
+          │                 ┌─────────────────┐           │
+          │                 │                 │           │
+          └─────────────────│  Mock Data      │◀──────────┘
+                            │  (数据 fallback) │
+                            │                 │
+                            └─────────────────┘
+```
+
+### 2.2 组件关系
+
+```
+┌─────────────────┐
+│                 │
+│    App.tsx      │
+│  (主应用组件)    │
+│                 │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│                                                 │
+│  三栏布局                                       │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│  │               │  │               │  │               │
+│  │  ChatPanel    │  │ CanvasViewer  │  │ EvidencePanel │
+│  │  (左侧栏)      │  │  (中间画布)    │  │  (右侧栏)      │
+│  │               │  │               │  │               │
+│  └───────────────┘  └───────────────┘  └───────────────┘
+│                                                 │
+└─────────────────────────────────────────────────┘
+```
+
+## 3. 核心库与依赖
+
+| 库名 | 版本 | 用途 | 来源 |
+|------|------|------|------|
+| React | 18.2.0 | 前端框架 | package.json |
+| TypeScript | 5.2.2 | 类型系统 | package.json |
+| Tailwind CSS | 3.4.0 | 样式框架 | package.json |
+| Zustand | 4.5.7 | 状态管理 | package.json |
+| Axios | 1.13.4 | HTTP 客户端 | package.json |
+| Lucide React | 0.294.0 | 图标库 | package.json |
+| Vite | 5.0.8 | 构建工具 | package.json |
+
+## 4. 关键变量与数据结构
+
+### 4.1 数据类型
+
+| 类型名 | 定义文件 | 用途 | 关键字段 |
+|--------|----------|------|----------|
+| CaseData | types/index.ts | 病例数据类型 | id, filename, malignancyScore, confidenceScore, findings, evidence |
+| AnalysisPoint | types/index.ts | 分析点类型 | category, description, citations |
+| EvidenceItem | types/index.ts | 证据项类型 | similarity, referenceId, source, relatedFeatures |
+| CaseStore | store/useCaseStore.ts | 状态管理类型 | currentCase, isAnalyzing, error, analyzeImage |
+
+### 4.2 核心状态
+
+| 状态变量 | 存储位置 | 类型 | 初始值 | 用途 |
+|----------|----------|------|--------|------|
+| currentCase | useCaseStore.ts | CaseData | MOCK_CASE | 当前病例数据 |
+| isAnalyzing | useCaseStore.ts | boolean | false | 分析中状态 |
+| error | useCaseStore.ts | string  null | null | 错误信息 |
+
+### 4.3 核心常量
+
+| 常量名 | 定义文件 | 类型 | 用途 |
+|--------|----------|------|------|
+| MOCK_CASE | lib/mock-data.ts | CaseData | 模拟病例数据，作为后端无响应时的 fallback |
+
+## 5. 核心功能流程
+
+### 5.1 文件上传与分析流程
+
+1. **用户操作**：在 CanvasViewer 组件中点击上传按钮
+2. **文件选择**：触发隐藏的文件输入框，用户选择图片文件
+3. **状态更新**：调用 `useCaseStore.analyzeImage(file)`，设置 `isAnalyzing: true`
+4. **API 调用**：`useCaseStore` 调用 `uploadSlide(file)` 方法
+5. **请求处理**：
+   - 成功：返回后端数据，更新 `currentCase`
+   - 失败：捕获错误，返回 `MOCK_CASE` 数据
+6. **状态更新**：设置 `isAnalyzing: false`，更新 `currentCase`
+7. **UI 更新**：所有组件从 `useCaseStore` 读取新数据并更新界面
+
+### 5.2 后端无响应处理流程
+
+1. **API 调用失败**：`uploadSlide` 方法捕获错误
+2. **日志记录**：控制台输出警告信息
+3. **模拟延迟**：使用 `setTimeout` 模拟网络延迟 1 秒
+4. **返回 Mock 数据**：返回 `MOCK_CASE` 数据
+5. **状态更新**：`useCaseStore` 更新 `currentCase` 为 Mock 数据
+6. **UI 保持**：用户界面显示 Mock 数据，确保演示流畅
+
+## 6. 配置与环境
+
+### 6.1 Vite 配置
+
+| 配置项 | 文件 | 用途 | 值 |
+|--------|------|------|------|
+| baseURL | vite.config.ts | API 基础路径 | /api |
+| server.proxy | vite.config.ts | 开发服务器代理 | { '/api': { target: 'http://localhost:8080', changeOrigin: true, secure: false } } |
+| resolve.alias | vite.config.ts | 路径别名 | { '@': path.resolve(__dirname, './src') } |
+
+### 6.2 环境变量
+
+| 变量名 | 用途 | 默认值 |
+|--------|------|--------|
+| VITE_API_BASE_URL | API 基础 URL | /api |
+| VITE_APP_PORT | 应用端口 | 5173 |
+
+## 7. 技术特点
+
+### 7.1 架构优势
+
+1. **模块化设计**：清晰的文件结构和职责分离
+2. **状态管理**：使用 Zustand 实现轻量级全局状态管理
+3. **类型安全**：全面使用 TypeScript 确保类型安全
+4. **容错机制**：后端无响应时使用 Mock 数据 fallback
+5. **响应式布局**：使用 Tailwind CSS 实现响应式设计
+6. **开发体验**：Vite 构建工具提供快速开发体验
+
+### 7.2 关键技术点
+
+1. **Axios 拦截器**：实现错误处理和数据 fallback
+2. **Zustand 状态管理**：简化状态管理，避免过度渲染
+3. **React Hooks**：使用 `useRef` 处理文件输入，`useState` 管理组件状态
+4. **Tailwind CSS**：实用优先的 CSS 框架，简化样式开发
+5. **TypeScript 类型定义**：确保数据结构的类型安全
+6. **Vite 代理配置**：解决开发环境跨域问题
+
+## 8. 未来扩展
+
+### 8.1 潜在扩展点
+
+1. **多病例管理**：支持多个病例的切换和比较
+2. **历史记录**：保存分析历史，支持回退到之前的分析结果
+3. **用户认证**：添加用户登录和权限管理
+4. **多模态分析**：支持多种类型的医学影像分析
+5. **报告导出**：支持将分析结果导出为 PDF 或其他格式
+6. **模型切换**：支持切换不同的 AI 模型进行分析
+
+### 8.2 架构适配
+
+当前架构设计具有良好的扩展性，可以通过以下方式支持未来扩展：
+
+1. **模块化组件**：现有的组件设计支持组合和复用
+2. **状态管理扩展**：Zustand 存储可以轻松扩展新的状态和动作
+3. **API 服务层**：中心化的 API 服务便于添加新的后端接口
+4. **类型系统**：TypeScript 类型定义支持渐进式扩展
+
+## 9. 总结
+
+IrisPath 项目采用了现代化的前端架构，结合 React、TypeScript、Tailwind CSS 和 Zustand 等技术，实现了一个功能完整、用户体验良好的医学影像分析系统。项目的核心优势在于：
+
+1. **清晰的模块化设计**：合理的文件结构和组件划分
+2. **健壮的错误处理**：后端无响应时的优雅降级机制
+3. **良好的用户体验**：流畅的加载状态和响应式布局
+4. **类型安全**：全面的 TypeScript 类型定义
+5. **可扩展性**：灵活的架构设计支持未来功能扩展
+
+这种架构设计不仅满足了当前的功能需求，也为未来的发展奠定了坚实的基础。
