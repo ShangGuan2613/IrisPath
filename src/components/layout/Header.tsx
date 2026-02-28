@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Sparkles, User } from 'lucide-react';
+import { Eye, Sparkles } from 'lucide-react';
 
 const Header: React.FC = () => {
   return (
